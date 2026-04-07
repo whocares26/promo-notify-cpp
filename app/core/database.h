@@ -11,8 +11,9 @@ class Database {
  public:
     explicit Database(const std::string& path) {
         if (sqlite3_open(path.c_str(), &db_) != SQLITE_OK) {
-            throw std::runtime_error(
-                std::string("Failed to open DB: ") + sqlite3_errmsg(db_));
+            std::string err = sqlite3_errmsg(db_);
+            sqlite3_close(db_);
+            throw std::runtime_error("Failed to open DB: " + err);
         }
     }
 
@@ -69,7 +70,7 @@ class Database {
     }
 
  private:
-    sqlite3* db = nullptr;
+    sqlite3* db_ = nullptr;   // ← было db, исправлено на db_
 };
 
 }  // namespace core

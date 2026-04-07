@@ -12,10 +12,20 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
+
 find_package(Boost REQUIRED COMPONENTS program_options system date_time)
 find_package(CURL REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(Threads REQUIRED)
 
+include(FetchContent)
+FetchContent_Declare(
+    crow
+    GIT_REPOSITORY https://github.com/CrowCpp/Crow.git
+    GIT_TAG v1.0+5
+)
+FetchContent_MakeAvailable(crow)
+
 add_subdirectory(app)
+add_subdirectory(app/tests)
