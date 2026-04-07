@@ -1,22 +1,17 @@
 FROM ubuntu:22.04 AS builder
 
-ENV DEBIAN_FRONTEND=noninteractive
-
 RUN apt-get update && apt-get install -y \
     cmake \
     g++ \
+    git \
     libboost-program-options-dev \
     libboost-system-dev \
     libboost-date-time-dev \
     libcurl4-openssl-dev \
     libsqlite3-dev \
     nlohmann-json3-dev \
-    wget \
+    libgtest-dev \
     && rm -rf /var/lib/apt/lists/*
-
-# Скачиваем crow.h (header-only библиотека)
-RUN wget -q https://github.com/CrowCpp/Crow/releases/download/v1.0+5/crow_all.h \
-    -O /usr/local/include/crow.h
 
 WORKDIR /build
 COPY . .
@@ -36,8 +31,8 @@ RUN apt-get update && apt-get install -y \
 
 RUN mkdir -p /data
 
-COPY --from=builder /build/build/app/promo_notify /usr/local/bin/promo_notify
+WORKDIR /app
+COPY --from=builder /build/build/app/promo_notify .
 
-EXPOSE 18080
-
-CMD ["/usr/local/bin/promo_notify"]
+EXPOSE 8080
+CMD ["./promo_notify"]
