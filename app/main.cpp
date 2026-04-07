@@ -135,6 +135,51 @@ int main() {
         return crow::response(200, res);
     });
 
+    // GET /campaigns/<id>/stats — аналитика по кампании
+    CROW_ROUTE(app, "/campaigns/<int>/stats").methods("GET"_method)
+    ([&campaign_service](int id) {
+        auto campaign = campaign_service.getCampaignStats(
+            static_cast<int64_t>(id));
+        crow::json::wvalue res;
+        if (!campaign) {
+            res["status"]  = "error";
+            res["message"] = "Campaign not found";
+            return crow::response(404, res);
+        }
+        res["status"]           = "ok";
+        res["id"]               = campaign->id;
+        res["name"]             = campaign->name;
+        res["phone"]            = campaign->phone;
+        res["message_template"] = campaign->message_template;
+        res["recipient_name"]   = campaign->recipient_name;
+        res["sms_status"]       = campaign->status;
+        return crow::response(200, res);
+    });
+
+    // POST /campaigns/<id>/resend — повторная отправка упавшей кампании
+    CROW_ROUTE(app, "/campaigns/<int>/resend").methods("POST"_method)
+    ([&campaign_service](int id) {
+        crow::json::wvalue res;
+        try {
+            bool sent = campaign_service.resendCampaign(
+                static_cast<int64_t>(id));
+            if (sent) {
+                res["status"] = "ok";
+                res["sent"]   = true;
+            } else {
+                res["status"]  = "error";
+                res["sent"]    = false;
+                res["message"] = "Resend failed: wrong status, "
+                                "unsubscribed, or SMS error";
+            }
+            return crow::response(sent ? 200 : 400, res);
+        } catch (const std::exception& e) {
+            res["status"]  = "error";
+            res["message"] = e.what();
+            return crow::response(500, res);
+        }
+    });
+
     app.port(cfg.port)
        .multithreaded()
        .run();

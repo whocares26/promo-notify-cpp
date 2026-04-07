@@ -54,6 +54,34 @@ class CampaignService {
         return fetchCampaign(id);
     }
 
+    bool resendCampaign(int64_t id) {
+        std::optional<models::Campaign> campaign = fetchCampaign(id);
+        if (!campaign) {
+            std::cerr << "[ERROR] Campaign not found: " << id << "\n";
+            return false;
+        }
+
+        if (campaign->status != "failed") {
+            std::cerr << "[ERROR] Campaign " << id
+                    << " has status '" << campaign->status
+                    << "', resend only allowed for 'failed'\n";
+            return false;
+        }
+
+        if (isUnsubscribed(campaign->phone)) {
+            std::cout << "[INFO] Phone " << campaign->phone
+                    << " is unsubscribed, skipping resend\n";
+            updateStatus(id, "skipped");
+            return false;
+        }
+
+        std::string msg = personalize(campaign->message_template,
+                                    campaign->recipient_name);
+        bool sent = sms_.send(campaign->phone, msg);
+        updateStatus(id, sent ? "sent" : "failed");
+        return sent;
+    }
+
  private:
     core::Database& db_;
     SmsAeroClient& sms_;
