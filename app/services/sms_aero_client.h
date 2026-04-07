@@ -1,13 +1,13 @@
 #pragma once
-#include <string>
-#include <iostream>
 #include <curl/curl.h>
+#include <iostream>
+#include <string>
 #include "nlohmann/json.hpp"
 
 namespace services {
 
 class SmsAeroClient {
-public:
+ public:
     SmsAeroClient(const std::string& email,
                   const std::string& api_key,
                   const std::string& sign = "SMS Aero",
@@ -20,9 +20,13 @@ public:
         curl_global_cleanup();
     }
 
+    SmsAeroClient(const SmsAeroClient&) = delete;
+    SmsAeroClient& operator=(const SmsAeroClient&) = delete;
+
     bool send(const std::string& phone, const std::string& message) {
         if (use_mock_) {
-            std::cout << "[MOCK SMS] To: " << phone << ", Message: " << message << "\n";
+            std::cout << "[MOCK SMS] To: " << phone
+                      << ", Message: " << message << "\n";
             return true;
         }
 
@@ -44,10 +48,12 @@ public:
         struct curl_slist* headers = nullptr;
         headers = curl_slist_append(headers, "Content-Type: application/json");
 
-        curl_easy_setopt(curl, CURLOPT_URL, "https://gate.smsaero.ru/v2/sms/send");
+        curl_easy_setopt(curl, CURLOPT_URL,
+                         "https://gate.smsaero.ru/v2/sms/send");
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body_str.c_str());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)body_str.size());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE,  // NOLINT(runtime/int)
+                         static_cast<long>(body_str.size()));  // NOLINT(runtime/int)
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         curl_easy_setopt(curl, CURLOPT_USERPWD, user_pwd.c_str());
         curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
@@ -60,7 +66,7 @@ public:
 
         CURLcode res = curl_easy_perform(curl);
 
-        long http_code = 0;
+        long http_code = 0;  // NOLINT(runtime/int)
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
         curl_slist_free_all(headers);
@@ -71,7 +77,8 @@ public:
             return false;
         }
         if (http_code != 200) {
-            std::cerr << "[ERROR] HTTP " << http_code << ": " << response << "\n";
+            std::cerr << "[ERROR] HTTP " << http_code << ": "
+                      << response << "\n";
             return false;
         }
 
@@ -79,14 +86,15 @@ public:
         return parseResponse(response);
     }
 
-private:
+ private:
     std::string email_;
     std::string api_key_;
     std::string sign_;
     bool use_mock_;
 
-    static size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
-        userp->append((char*)contents, size * nmemb);
+    static size_t writeCallback(void* contents, size_t size, size_t nmemb,
+                                std::string* userp) {
+        userp->append(static_cast<char*>(contents), size * nmemb);
         return size * nmemb;
     }
 
@@ -97,14 +105,16 @@ private:
                 std::cout << "[INFO] SMS sent successfully\n";
                 return true;
             } else {
-                std::cerr << "[ERROR] SmsAero: " << json.value("message", "unknown error") << "\n";
+                std::cerr << "[ERROR] SmsAero: "
+                          << json.value("message", "unknown error") << "\n";
                 return false;
             }
         } catch (const std::exception& e) {
-            std::cerr << "[ERROR] Failed to parse response: " << e.what() << " - " << response << "\n";
+            std::cerr << "[ERROR] Failed to parse response: "
+                      << e.what() << " - " << response << "\n";
             return false;
         }
     }
 };
 
-} // namespace services
+}  // namespace services

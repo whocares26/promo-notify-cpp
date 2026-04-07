@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    ports:
+      - "18080:18080"
+    environment:
+      - APP_PORT=18080
+      - DB_PATH=/data/promo_notify.db
+      - SMS_EMAIL=${SMS_EMAIL:-}
+      - SMS_API_KEY=${SMS_API_KEY:-}
+      - SMS_SIGN=${SMS_SIGN:-SMS Aero}
+      - SMS_PHONE=${SMS_PHONE:-}
+      - SMS_RU_USE_MOCK=${SMS_RU_USE_MOCK:-true}
+    volumes:
+      - db_data:/data
+
+volumes:
+  db_data:

@@ -1,7 +1,6 @@
 set(TARGET_NAME promo_notify)
 
 file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
-
 file(GLOB_RECURSE HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
 
 add_executable(${TARGET_NAME} ${SOURCES})
@@ -18,7 +17,6 @@ target_link_libraries(${TARGET_NAME} PRIVATE
     Boost::date_time
     CURL::libcurl
     SQLite::SQLite3
-    spdlog::spdlog
     nlohmann_json::nlohmann_json
     Threads::Threads
 )
