@@ -50,6 +50,10 @@ class CampaignService {
         std::cout << "[INFO] Unsubscribed: " << phone << "\n";
     }
 
+    std::optional<models::Campaign> getCampaignStats(int64_t id) {
+        return fetchCampaign(id);
+    }
+
  private:
     core::Database& db_;
     SmsAeroClient& sms_;
