@@ -1,9 +1,9 @@
 FROM ubuntu:22.04 AS builder
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && apt-get install -y \
-    cmake \
-    g++ \
-    git \
+    cmake g++ git \
     libboost-program-options-dev \
     libboost-system-dev \
     libboost-date-time-dev \
@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
     nlohmann-json3-dev \
     libgtest-dev \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -27,12 +28,17 @@ RUN apt-get update && apt-get install -y \
     libboost-date-time1.74.0 \
     libcurl4 \
     libsqlite3-0 \
+    sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /data
 
 WORKDIR /app
-COPY --from=builder /build/build/app/promo_notify .
 
-EXPOSE 8080
-CMD ["./promo_notify"]
+# Копируем оба бинарника
+COPY --from=builder /build/build/app/promo_notify .
+COPY --from=builder /build/build/app/tests/promo_tests .
+
+EXPOSE 18080
+
+CMD ["/app/promo_notify"]
