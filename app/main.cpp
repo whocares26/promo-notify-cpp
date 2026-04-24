@@ -1,4 +1,6 @@
-#include "crow.h"
+#include <crow.h>
+#include <string>
+
 #include "core/config.h"
 #include "core/database.h"
 #include "models/campaign.h"
@@ -36,7 +38,7 @@ int main() {
 
     crow::SimpleApp app;
 
-    // GET /health — проверка работоспособности сервиса
+    // GET /health
     CROW_ROUTE(app, "/health")
     ([]() {
         crow::json::wvalue res;
@@ -44,8 +46,7 @@ int main() {
         return crow::response(200, res);
     });
 
-    // POST /campaigns — создать кампанию
-    // Body: { "name", "phone", "message_template", "recipient_name"? }
+    // POST /campaigns
     CROW_ROUTE(app, "/campaigns").methods("POST"_method)
     ([&campaign_service](const crow::request& req) {
         auto body = crow::json::load(req.body);
@@ -85,7 +86,7 @@ int main() {
         }
     });
 
-    // POST /campaigns/<id>/send — отправить SMS по кампании
+    // POST /campaigns/<id>/send
     CROW_ROUTE(app, "/campaigns/<int>/send").methods("POST"_method)
     ([&campaign_service](int id) {
         try {
@@ -108,15 +109,14 @@ int main() {
         }
     });
 
-    // POST /unsubscribe — отписать номер от уведомлений
-    // Body: { "phone" }
+    // POST /unsubscribe
     CROW_ROUTE(app, "/unsubscribe").methods("POST"_method)
     ([&campaign_service](const crow::request& req) {
         auto body = crow::json::load(req.body);
-        if (!body) {
+        if (!body || !body.has("phone")) {
             crow::json::wvalue res;
             res["status"]  = "error";
-            res["message"] = "Invalid JSON";
+            res["message"] = "Invalid JSON or missing 'phone' field";
             return crow::response(400, res);
         }
 
@@ -133,6 +133,48 @@ int main() {
         res["status"]  = "ok";
         res["message"] = "Unsubscribed successfully";
         return crow::response(200, res);
+    });
+
+    // GET /campaigns/<id>/stats
+    CROW_ROUTE(app, "/campaigns/<int>/stats").methods("GET"_method)
+    ([&campaign_service](int id) {
+        auto campaign = campaign_service.getCampaignStats(static_cast<int64_t>(id));
+        crow::json::wvalue res;
+        if (!campaign) {
+            res["status"]  = "error";
+            res["message"] = "Campaign not found";
+            return crow::response(404, res);
+        }
+        res["status"]           = "ok";
+        res["id"]               = campaign->id;
+        res["name"]             = campaign->name;
+        res["phone"]            = campaign->phone;
+        res["message_template"] = campaign->message_template;
+        res["recipient_name"]   = campaign->recipient_name;
+        res["sms_status"]       = campaign->status;
+        return crow::response(200, res);
+    });
+
+    // POST /campaigns/<id>/resend
+    CROW_ROUTE(app, "/campaigns/<int>/resend").methods("POST"_method)
+    ([&campaign_service](int id) {
+        crow::json::wvalue res;
+        try {
+            bool sent = campaign_service.resendCampaign(static_cast<int64_t>(id));
+            if (sent) {
+                res["status"] = "ok";
+                res["sent"]   = true;
+            } else {
+                res["status"]  = "error";
+                res["sent"]    = false;
+                res["message"] = "Resend failed: wrong status, unsubscribed, or SMS error";
+            }
+            return crow::response(sent ? 200 : 400, res);
+        } catch (const std::exception& e) {
+            res["status"]  = "error";
+            res["message"] = e.what();
+            return crow::response(500, res);
+        }
     });
 
     app.port(cfg.port)

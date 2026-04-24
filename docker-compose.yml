@@ -1,8 +1,7 @@
 services:
   app:
     build: .
-    ports:
-      - "18080:18080"
+    network_mode: host
     environment:
       - APP_PORT=18080
       - DB_PATH=/data/promo_notify.db
