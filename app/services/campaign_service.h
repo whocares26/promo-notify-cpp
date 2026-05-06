@@ -1,7 +1,10 @@
 #pragma once
 #include <iostream>
 #include <optional>
+#include <ostream>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "core/database.h"
 #include "models/campaign.h"
@@ -52,6 +55,98 @@ class CampaignService {
 
     std::optional<models::Campaign> getCampaignStats(int64_t id) {
         return fetchCampaign(id);
+    }
+
+    models::StatsSummary getSummaryStats() {
+        std::unordered_map<std::string, models::PromoStats> by_name;
+        std::vector<std::string> order;
+        models::StatsSummary summary;
+
+        db_.query(
+            "SELECT name, phone, status FROM campaigns "
+            "ORDER BY id ASC",
+            {},
+            [&](sqlite3_stmt* stmt) {
+                std::string name = reinterpret_cast<const char*>(
+                    sqlite3_column_text(stmt, 0));
+                std::string phone = reinterpret_cast<const char*>(
+                    sqlite3_column_text(stmt, 1));
+                std::string status = reinterpret_cast<const char*>(
+                    sqlite3_column_text(stmt, 2));
+
+                auto it = by_name.find(name);
+                if (it == by_name.end()) {
+                    models::PromoStats ps;
+                    ps.name = name;
+                    by_name.emplace(name, ps);
+                    order.push_back(name);
+                    it = by_name.find(name);
+                }
+                models::PromoStats& ps = it->second;
+                ps.total += 1;
+                summary.total += 1;
+
+                if (status == "sent") {
+                    ps.sent += 1;
+                    ps.sent_phones.push_back(phone);
+                    summary.sent += 1;
+                } else if (status == "skipped") {
+                    ps.skipped += 1;
+                    ps.skipped_phones.push_back(phone);
+                    summary.skipped += 1;
+                } else if (status == "failed") {
+                    ps.failed += 1;
+                    summary.failed += 1;
+                } else {
+                    ps.created += 1;
+                    summary.created += 1;
+                }
+            });
+
+        for (const auto& name : order) {
+            summary.promos.push_back(by_name[name]);
+        }
+        return summary;
+    }
+
+    void printSummaryStats(std::ostream& out) {
+        models::StatsSummary s = getSummaryStats();
+        out << "\n=== Сводная статистика рассылок ===\n";
+        if (s.promos.empty()) {
+            out << "Кампаний пока нет.\n";
+            return;
+        }
+        for (const auto& p : s.promos) {
+            out << "\nАкция: \"" << p.name << "\"\n";
+            out << "  Всего кампаний: " << p.total << "\n";
+            out << "  Отправлено:     " << p.sent << "\n";
+            if (!p.sent_phones.empty()) {
+                out << "    -> ";
+                for (size_t i = 0; i < p.sent_phones.size(); ++i) {
+                    if (i) out << ", ";
+                    out << p.sent_phones[i];
+                }
+                out << "\n";
+            }
+            out << "  Пропущено (отписаны): " << p.skipped << "\n";
+            if (!p.skipped_phones.empty()) {
+                out << "    -> ";
+                for (size_t i = 0; i < p.skipped_phones.size(); ++i) {
+                    if (i) out << ", ";
+                    out << p.skipped_phones[i];
+                }
+                out << "\n";
+            }
+            out << "  Ошибка:         " << p.failed << "\n";
+            out << "  В очереди:      " << p.created << "\n";
+        }
+        out << "\n=== ИТОГО ===\n";
+        out << "Всего кампаний:       " << s.total << "\n";
+        out << "Отправлено:           " << s.sent << "\n";
+        out << "Пропущено (отписаны): " << s.skipped << "\n";
+        out << "Ошибка:               " << s.failed << "\n";
+        out << "В очереди:            " << s.created << "\n";
+        out.flush();
     }
 
     bool resendCampaign(int64_t id) {

@@ -1,4 +1,5 @@
 #include <crow.h>
+#include <iostream>
 #include <string>
 
 #include "core/config.h"
@@ -22,7 +23,15 @@ static const char* kInitSql =
     "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
     ");";
 
-int main() {
+int main(int argc, char** argv) {
+    bool stats_mode = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--stats") {
+            stats_mode = true;
+        }
+    }
+
     config::AppConfig cfg = config::AppConfig::load();
 
     core::Database db(cfg.db_path);
@@ -35,6 +44,11 @@ int main() {
         cfg.sms_ru_use_mock);
 
     services::CampaignService campaign_service(db, sms_client);
+
+    if (stats_mode) {
+        campaign_service.printSummaryStats(std::cout);
+        return 0;
+    }
 
     crow::SimpleApp app;
 
@@ -152,6 +166,52 @@ int main() {
         res["message_template"] = campaign->message_template;
         res["recipient_name"]   = campaign->recipient_name;
         res["sms_status"]       = campaign->status;
+        return crow::response(200, res);
+    });
+
+    // GET /stats — сводная статистика по всем рассылкам
+    CROW_ROUTE(app, "/stats").methods("GET"_method)
+    ([&campaign_service]() {
+        models::StatsSummary s = campaign_service.getSummaryStats();
+        // Печатаем сводку прямо в терминал сервера
+        campaign_service.printSummaryStats(std::cout);
+
+        crow::json::wvalue res;
+        res["status"] = "ok";
+        res["totals"]["total"]    = s.total;
+        res["totals"]["sent"]     = s.sent;
+        res["totals"]["skipped"]  = s.skipped;
+        res["totals"]["failed"]   = s.failed;
+        res["totals"]["created"]  = s.created;
+
+        std::vector<crow::json::wvalue> promos;
+        promos.reserve(s.promos.size());
+        for (const auto& p : s.promos) {
+            crow::json::wvalue item;
+            item["name"]     = p.name;
+            item["total"]    = p.total;
+            item["sent"]     = p.sent;
+            item["skipped"]  = p.skipped;
+            item["failed"]   = p.failed;
+            item["created"]  = p.created;
+
+            std::vector<crow::json::wvalue> sent_phones;
+            sent_phones.reserve(p.sent_phones.size());
+            for (const auto& ph : p.sent_phones) {
+                sent_phones.emplace_back(ph);
+            }
+            item["sent_phones"] = std::move(sent_phones);
+
+            std::vector<crow::json::wvalue> skipped_phones;
+            skipped_phones.reserve(p.skipped_phones.size());
+            for (const auto& ph : p.skipped_phones) {
+                skipped_phones.emplace_back(ph);
+            }
+            item["skipped_phones"] = std::move(skipped_phones);
+
+            promos.push_back(std::move(item));
+        }
+        res["promos"] = std::move(promos);
         return crow::response(200, res);
     });
 
