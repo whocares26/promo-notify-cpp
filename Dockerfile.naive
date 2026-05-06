@@ -1,0 +1,35 @@
+# Намеренно неоптимизированный одностадийный Dockerfile.
+# Используется для лабораторной работы №5 как baseline в таблице
+# "размер контейнера до оптимизации".
+#
+# Финальный образ содержит весь тулчейн сборки (cmake, g++, исходники,
+# заголовочные файлы, объектные файлы) — то есть то, чего быть не должно
+# в продакшен-образе.
+
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    cmake g++ git \
+    libboost-program-options-dev \
+    libboost-system-dev \
+    libboost-date-time-dev \
+    libcurl4-openssl-dev \
+    libsqlite3-dev \
+    nlohmann-json3-dev \
+    libgtest-dev \
+    sqlite3 \
+    wget
+
+WORKDIR /app
+COPY . .
+
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build --parallel
+
+RUN mkdir -p /data
+
+EXPOSE 18080
+
+CMD ["/app/build/app/promo_notify"]
